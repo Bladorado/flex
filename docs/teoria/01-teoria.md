@@ -1,6 +1,5 @@
 # 01 — Teoría previa: PostgreSQL desde cero
 
-> Nivel: Sin conocimientos previos de bases de datos  
 > Objetivo: entender los conceptos que aparecen en el esquema de Flex antes de leer el código
 
 ---
