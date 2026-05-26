@@ -4,7 +4,7 @@ create table public.perfiles (
   id         uuid primary key references auth.users(id) on delete cascade,
   nombre     text,
   rol        text not null default 'cliente'
-             check (rol in ('cliente', 'staff', 'admin')),
+             check (rol in ('cliente', 'staff', 'admin', 'portero')),
   avatar_url text,
   creado_en  timestamptz not null default now()
 );

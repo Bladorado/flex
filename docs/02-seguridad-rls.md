@@ -94,15 +94,26 @@ create policy "perfil propio: lectura"
   on public.perfiles for select
   using ( id = auth.uid() );
 
-create policy "perfil propio: edición"
+create policy "perfil propio de cliente: edición"
   on public.perfiles for update
-  using ( id = auth.uid() )
-  with check ( id = auth.uid() );
+  using ( id = auth.uid() AND rol = 'cliente' )
+  with check ( id = auth.uid() AND rol = 'cliente' );
+
+create policy "perfil propio de staff: edición"
+  on public.perfiles for update
+  using ( id = auth.uid() AND rol = 'staff' )
+  with check ( id = auth.uid() AND rol = 'staff' );
+
+create policy "perfil propio de portero: edición"
+  on public.perfiles for update
+  using ( id = auth.uid() AND rol = 'portero' )
+  with check ( id = auth.uid() AND rol = 'portero' );
 
 -- El admin ve todos los perfiles
-create policy "admin: lectura total perfiles"
-  on public.perfiles for select
+create policy "admin: puede hacer de todo total perfiles"
+  on public.perfiles for all
   using ( public.mi_rol() = 'admin' );
+  with check ( public.mi_rol() = 'admin' );
 
 -- El trigger de registro (apunte 01) necesita insertar con service_role,
 -- que ignora RLS. No necesitamos política de INSERT para clientes.

@@ -6,8 +6,6 @@
 
 ## Estructura del monorepo
 
-El proyecto Flex usa una estructura **monorepo**: una sola carpeta raíz que contiene múltiples aplicaciones. Por ahora solo tenemos la app web; más adelante podría añadirse una app móvil o un panel de administración sin cambiar la organización raíz.
-
 ```text
 flex/                   ← raíz del monorepo
   apps/
@@ -25,496 +23,325 @@ Desde la raíz del proyecto:
 
 ```bash
 mkdir apps
-pnpm create next-app apps/web --no-typescript --tailwind --app --no-src-dir --import-alias "@/*"
-```
-
-Opciones que seleccionamos al asistente interactivo (si no pasamos flags):
-
-| Pregunta          | Respuesta |
-| ----------------- | --------- |
-| TypeScript        | No        |
-| ESLint            | Sí        |
-| Tailwind CSS      | Sí        |
-| `src/` directory  | No        |
-| App Router        | Sí        |
-| Import alias      | `@/*`     |
-
-```bash
+npx create-next-app@latest web --no-typescript --tailwind --app --src-dir --import-alias "@/*"
 cd apps/web
-pnpm add lucide-react         # iconos
-```
-
-Arrancamos el servidor de desarrollo:
-
-```bash
-pnpm dev
-```
-
-Abre [http://localhost:3000](http://localhost:3000) — verás la página de bienvenida de Next.js. La vamos a reemplazar completamente.
-
----
-
-## 2. Paleta de colores y tema
-
-El diseño de Flex usa fondo negro con dorado como color de acento. Añadimos los colores custom a Tailwind:
-
-```js
-// tailwind.config.js
-/** @type {import('tailwindcss').Config} */
-const config = {
-  content: ['./app/**/*.{js,jsx}', './components/**/*.{js,jsx}'],
-  theme: {
-    extend: {
-      colors: {
-        gold: {
-          400: '#D4A843',
-          500: '#C9A030',
-          600: '#A07820',
-        },
-      },
-    },
-  },
-}
-
-module.exports = config
-```
-
-Estilos globales base:
-
-```css
-/* app/globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  body {
-    @apply bg-zinc-950 text-zinc-100 antialiased;
-  }
-
-  ::-webkit-scrollbar {
-    @apply w-1;
-  }
-
-  ::-webkit-scrollbar-track {
-    @apply bg-zinc-900;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-zinc-700 rounded-full;
-  }
-}
+npm install lucide-react
+npm run dev
 ```
 
 ---
 
-## 3. Layout: sidebar + área principal
+## 2. Tailwind v4 y tipografía
 
-El layout raíz define la estructura que comparten todas las páginas: una barra lateral fija a la izquierda y el contenido scrollable a la derecha.
+Con Tailwind v4 no hay `tailwind.config.js`. Todo va en CSS.
+
+Las fuentes se cargan desde Google Fonts en el `<head>` del layout:
+
+- **Inter** — cuerpo, etiquetas, navegación
+- **Cormorant Garant** — títulos `h1 / h2 / h3` (serif elegante, coherente con el logo)
 
 ```jsx
-// app/layout.jsx
+// src/app/layout.jsx
 import './globals.css'
-import Sidebar from '@/components/Sidebar'
+import Shell from '@/components/Shell'
 
-export const metadata = {
-  title: 'Flex — Live Experience',
-  description: 'Tu noche, tu ritmo',
-}
+export const metadata = { title: 'Flex — Live Sessions', description: 'Tu noche, tu ritmo' }
 
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-      </body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Cormorant+Garant:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body><Shell>{children}</Shell></body>
     </html>
   )
 }
 ```
 
-### Sidebar
+```css
+/* src/app/globals.css */
+@import "tailwindcss";
+
+@theme {
+  --color-gold-400: #D4A843;
+  --color-gold-500: #C9A030;
+  --color-gold-600: #A07820;
+  --font-display: 'Cormorant Garant', Georgia, serif;
+}
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  @apply antialiased;
+}
+
+h1, h2, h3 { font-family: 'Cormorant Garant', Georgia, serif; }
+
+::-webkit-scrollbar { @apply w-1; }
+::-webkit-scrollbar-track { @apply bg-zinc-900; }
+::-webkit-scrollbar-thumb { @apply bg-zinc-700 rounded-full; }
+```
+
+---
+
+## 3. Shell — layout responsivo
+
+El componente `Shell` decide qué navegación mostrar según el tamaño de pantalla:
+
+- **Móvil** — barra de navegación inferior fija (estilo app nativa)
+- **Desktop** — sidebar lateral estático
+
+Las rutas `/login` y `/register` omiten la navegación por completo.
 
 ```jsx
-// components/Sidebar.jsx
+// src/components/Shell.jsx  (simplificado)
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import {
-  Home, Music, Clock, Ticket,
-  Crown, Activity, Bell, HelpCircle, Settings,
-} from 'lucide-react'
+const AUTH_ROUTES = ['/login', '/register']
 
-const NAV_ITEMS = [
-  { icon: Home,        label: 'Inicio',          href: '/' },
-  { icon: Music,       label: 'Pedir canción',   href: '/canciones' },
-  { icon: Clock,       label: 'Mi turno',        href: '/turno' },
-  { icon: Ticket,      label: 'Mis entradas',    href: '/entradas' },
-  { icon: Crown,       label: 'Salas VIP',       href: '/vip' },
-  { icon: Activity,    label: 'Actividades',     href: '/actividades' },
-  { icon: Bell,        label: 'Notificaciones',  href: '/notificaciones' },
-  { icon: HelpCircle,  label: 'Ayuda',           href: '/ayuda' },
-  { icon: Settings,    label: 'Configuración',   href: '/configuracion' },
-]
-
-export default function Sidebar() {
+export default function Shell({ children }) {
   const pathname = usePathname()
+  if (AUTH_ROUTES.includes(pathname)) return <>{children}</>
 
   return (
-    <aside className="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0">
-      {/* Logo */}
-      <div className="px-6 py-6 border-b border-zinc-800">
-        <span className="text-2xl font-bold text-gold-400 tracking-widest">ƒFLEX</span>
+    <div className="flex h-screen overflow-hidden">
+      {/* Sidebar solo en desktop */}
+      <div className="hidden lg:block"><Sidebar /></div>
+
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Header móvil */}
+        <header className="lg:hidden ...">FLEX</header>
+        {/* Contenido con padding inferior para la barra */}
+        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">{children}</main>
       </div>
 
-      {/* Navegación */}
-      <nav className="flex-1 py-4 space-y-1 px-3">
-        {NAV_ITEMS.map(({ icon: Icon, label, href }) => {
-          const activo = pathname === href
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                activo
-                  ? 'bg-gold-500/20 text-gold-400'
-                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
-              }`}
-            >
-              <Icon size={18} />
-              {label}
-            </Link>
-          )
-        })}
-      </nav>
-
-      {/* Usuario */}
-      <div className="px-4 py-4 border-t border-zinc-800">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gold-500/30 flex items-center justify-center text-gold-400 text-sm font-bold">
-            A
-          </div>
-          <div>
-            <p className="text-sm font-medium text-zinc-100">Alex</p>
-            <p className="text-xs text-zinc-500">Cliente</p>
-          </div>
-        </div>
-      </div>
-    </aside>
+      {/* Barra inferior solo en móvil */}
+      <BottomNav />
+    </div>
   )
 }
 ```
 
+### Barra de navegación móvil
+
+Cinco slots fijos en la parte inferior:
+
+| Slot | Destino |
+| ---- | ------- |
+| Pedir | `/` |
+| VIP | `/vip` |
+| Mi área | `/mi-area` |
+| Perfil | `/perfil` |
+| Gestión *(botón elevado central)* | Despliega panel con Staff · Porteros · Admin |
+
+El botón **Gestión** es un círculo elevado (`-translate-y-3`) que al pulsarse abre un panel flotante encima de la barra con los tres accesos de gestión interna.
+
 ---
 
-## 4. Página de inicio (Dashboard)
+## 4. Sidebar (desktop)
 
-La página principal muestra: el evento destacado, el turno del usuario, próximos eventos, entradas y acceso rápido a salas VIP.
+El sidebar incluye:
+
+- Logo SVG (`FlexLogo`) — `src/components/FlexLogo.jsx`
+- Dos grupos de navegación: **Cliente** y **Gestión**
+- Zona de usuario en la parte inferior: clic navega a `/perfil`
 
 ```jsx
-// app/page.jsx
-import TarjetaEvento from '@/components/TarjetaEvento'
-import PanelTurno from '@/components/PanelTurno'
-import SeccionVIP from '@/components/SeccionVIP'
-
-const EVENTO_DESTACADO = {
-  titulo: 'Jazz Nights',
-  fecha: 'Sábado, 25 de mayo',
-  hora: '22:00 — 04:00h',
-  lugar: 'Flex Principal',
-}
-
-const PROXIMOS_EVENTOS = [
-  { id: 1, titulo: 'Jazz Nights',  fecha: '25 mayo', genero: 'Jazz / Blues',   precio: 'Desde 15€' },
-  { id: 2, titulo: 'Soul & Blues', fecha: '31 mayo', genero: 'Soul / R&B',     precio: 'Desde 12€' },
-  { id: 3, titulo: 'Latin Jazz',   fecha: '07 jun',  genero: 'Latin / Fusión', precio: 'Desde 10€' },
+// src/components/Sidebar.jsx  (fragmento)
+const NAV_CLIENTE = [
+  { icon: ShoppingCart, label: 'Pedir',     href: '/' },
+  { icon: Crown,        label: 'Salas VIP', href: '/vip' },
+  { icon: User,         label: 'Mi área',   href: '/mi-area' },
 ]
 
-export default function Inicio() {
-  return (
-    <div className="p-8 space-y-10">
-
-      {/* Cabecera */}
-      <div>
-        <p className="text-zinc-500 text-sm">Bienvenido, Alex 👋</p>
-        <h1 className="text-2xl font-bold text-zinc-100">¿Qué te vas a tomar esta noche?</h1>
-      </div>
-
-      {/* Hero + Turno */}
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2">
-          <BannerEvento evento={EVENTO_DESTACADO} />
-        </div>
-        <PanelTurno numero={4} espera="25 – 30 min" />
-      </div>
-
-      {/* Próximos eventos */}
-      <section>
-        <h2 className="text-lg font-semibold text-zinc-100 mb-4">Próximos eventos</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {PROXIMOS_EVENTOS.map((evento) => (
-            <TarjetaEvento key={evento.id} {...evento} />
-          ))}
-        </div>
-      </section>
-
-      {/* Salas VIP */}
-      <SeccionVIP />
-
-    </div>
-  )
-}
-
-function BannerEvento({ evento }) {
-  return (
-    <div className="relative rounded-2xl overflow-hidden h-64 bg-zinc-800">
-      {/* Imagen de fondo (placeholder hasta tener las fotos reales) */}
-      <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-900/60 to-transparent" />
-
-      <div className="absolute inset-0 flex flex-col justify-end p-6">
-        <p className="text-gold-400 text-xs font-semibold uppercase tracking-wider mb-1">
-          Evento destacado
-        </p>
-        <h2 className="text-3xl font-bold text-white mb-2">{evento.titulo}</h2>
-        <div className="flex items-center gap-4 text-zinc-400 text-sm">
-          <span>{evento.fecha}</span>
-          <span>·</span>
-          <span>{evento.hora}</span>
-          <span>·</span>
-          <span>{evento.lugar}</span>
-        </div>
-        <button className="mt-4 w-fit px-5 py-2 bg-gold-500 hover:bg-gold-600 text-zinc-950 text-sm font-semibold rounded-lg transition-colors">
-          Ver entradas
-        </button>
-      </div>
-    </div>
-  )
-}
-```
-
----
-
-## 5. Componentes estáticos
-
-### `TarjetaEvento`
-
-```jsx
-// components/TarjetaEvento.jsx
-export default function TarjetaEvento({ titulo, fecha, genero, precio }) {
-  return (
-    <div className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-colors cursor-pointer group">
-      {/* Imagen placeholder */}
-      <div className="h-36 bg-zinc-800 group-hover:bg-zinc-750 transition-colors" />
-
-      <div className="p-4">
-        <p className="text-gold-400 text-xs font-medium mb-1">{fecha}</p>
-        <h3 className="text-zinc-100 font-semibold">{titulo}</h3>
-        <p className="text-zinc-500 text-sm mt-0.5">{genero}</p>
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-zinc-400 text-sm">{precio}</span>
-          <button className="text-xs px-3 py-1 border border-gold-500/40 text-gold-400 rounded-lg hover:bg-gold-500/10 transition-colors">
-            Entradas
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-```
-
-### `PanelTurno`
-
-```jsx
-// components/PanelTurno.jsx
-export default function PanelTurno({ numero, espera }) {
-  return (
-    <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6 flex flex-col">
-      <h3 className="text-sm font-medium text-zinc-400 mb-auto">Mi turno</h3>
-
-      <div className="flex-1 flex flex-col items-center justify-center py-4">
-        <p className="text-zinc-500 text-xs mb-2">Tu posición en fila</p>
-        <p className="text-7xl font-bold text-gold-400 leading-none">#{numero}</p>
-        <p className="text-zinc-500 text-sm mt-3">{espera}</p>
-      </div>
-
-      <button className="mt-4 w-full py-2 text-sm border border-zinc-700 text-zinc-400 rounded-lg hover:bg-zinc-800 transition-colors">
-        Ver fila de espera
-      </button>
-    </div>
-  )
-}
-```
-
-### `SeccionVIP`
-
-```jsx
-// components/SeccionVIP.jsx
-const SALAS = [
-  { id: 1, nombre: 'Sala Roja',  capacidad: 10, precio_hora: 150, disponible: true  },
-  { id: 2, nombre: 'Sala Azul',  capacidad: 8,  precio_hora: 120, disponible: false },
-  { id: 3, nombre: 'Sala Negra', capacidad: 15, precio_hora: 200, disponible: true  },
+const NAV_STAFF = [
+  { icon: ShieldCheck,     label: 'Panel Staff', href: '/staff' },
+  { icon: QrCode,          label: 'Porteros',    href: '/porteros' },
+  { icon: LayoutDashboard, label: 'Admin',       href: '/admin' },
 ]
-
-export default function SeccionVIP() {
-  return (
-    <section>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-zinc-100">Salas VIP</h2>
-        <a href="/vip" className="text-sm text-gold-400 hover:text-gold-300">
-          Ver todas →
-        </a>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        {SALAS.map((sala) => (
-          <div
-            key={sala.id}
-            className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 hover:border-zinc-700 transition-colors"
-          >
-            {/* Imagen placeholder */}
-            <div className="h-28 bg-zinc-800 rounded-lg mb-4" />
-
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-semibold text-zinc-100">{sala.nombre}</h3>
-                <p className="text-zinc-500 text-sm">Hasta {sala.capacidad} personas</p>
-              </div>
-              <span
-                className={`text-xs px-2 py-1 rounded-full ${
-                  sala.disponible
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : 'bg-zinc-700 text-zinc-500'
-                }`}
-              >
-                {sala.disponible ? 'Disponible' : 'Ocupada'}
-              </span>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between">
-              <span className="text-gold-400 font-semibold">{sala.precio_hora} €/h</span>
-              <button
-                disabled={!sala.disponible}
-                className="text-sm px-4 py-1.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-950 font-semibold rounded-lg transition-colors"
-              >
-                Reservar
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
 ```
+
+### Logo SVG
+
+El logo es un componente SVG puro (`src/components/FlexLogo.jsx`) que renderiza:
+
+- **FLEX** en tipografía serif itálica con degradado dorado
+- Línea separadora fina
+- **LIVE SESSIONS** en letras espaciadas
+
+No depende de imágenes externas ni fuentes de Google.
 
 ---
 
-## 6. Página de Salas VIP
+## 5. Páginas
+
+### 5.1 Auth — `/login` y `/register`
+
+Layout split: foto de Unsplash a la izquierda, formulario a la derecha. En móvil la foto actúa como fondo tenue.
 
 ```jsx
-// app/vip/page.jsx
-import SeccionVIP from '@/components/SeccionVIP'
-
-export default function PaginaVIP() {
-  return (
-    <div className="p-8 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Salas VIP</h1>
-        <p className="text-zinc-500 mt-1">Reserva una sala privada para tu grupo</p>
-      </div>
-      <SeccionVIP />
-    </div>
-  )
-}
+// Foto de ambiente nocturno desde Unsplash (sin coste, sin clave de API)
+<img src="https://images.unsplash.com/photo-XXXXX?w=1200&auto=format&fit=crop&q=80" />
 ```
+
+Ambas páginas están fuera del `Shell` (sin sidebar ni barra inferior).
 
 ---
 
-## 7. Página de Mis Entradas
+### 5.2 Pedir a mesa — `/`
+
+El cliente filtra por categoría, añade productos y envía el pedido.
+
+**Datos estáticos:** 12 productos con `nombre`, `categoria`, `precio` e `img` (URL de Unsplash).
+
+**Estado local:**
+
+| Variable | Descripción |
+| -------- | ----------- |
+| `cat` | Categoría activa (Todo / Bebida / Comida) |
+| `carrito` | Array de `{ ...producto, cantidad }` |
+| `carritoAbierto` | Visibilidad del drawer lateral |
+| `pedidoEnviado` | Banner de confirmación temporal |
+| `modalMesa` | Visibilidad del modal de número de mesa |
+| `mesa` | Número de mesa introducido por el usuario |
+
+**Flujo del carrito:**
+
+1. Botón flotante dorado (esquina inferior derecha) muestra el número de ítems
+2. Al pulsarlo se abre un **drawer** deslizable desde la derecha (`translate-x-full → translate-x-0`)
+3. Al pulsar **Enviar pedido** aparece un **modal** preguntando el número de mesa
+4. Al confirmar se muestra el banner de éxito y el drawer se cierra automáticamente
 
 ```jsx
-// app/entradas/page.jsx
-const MIS_ENTRADAS = [
-  {
-    id: 1,
-    evento: 'Jazz Nights',
-    fecha: 'Sáb, 25 mayo · 22:00h',
-    tipo: 'Pista Principal',
-    precio: 15,
-    codigo: 'FLEX-2C7B',
-  },
-]
-
-export default function PaginaEntradas() {
-  return (
-    <div className="p-8 space-y-8">
-      <h1 className="text-2xl font-bold text-zinc-100">Mis entradas</h1>
-
-      {MIS_ENTRADAS.length === 0 ? (
-        <div className="text-center py-20 text-zinc-500">
-          <p>No tienes entradas todavía</p>
-          <a href="/" className="text-gold-400 text-sm mt-2 inline-block hover:text-gold-300">
-            Ver próximos eventos →
-          </a>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {MIS_ENTRADAS.map((entrada) => (
-            <div
-              key={entrada.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-center gap-6"
-            >
-              {/* QR placeholder */}
-              <div className="w-24 h-24 bg-white rounded-xl shrink-0" />
-
-              <div className="flex-1">
-                <h3 className="font-bold text-zinc-100 text-lg">{entrada.evento}</h3>
-                <p className="text-zinc-400 text-sm mt-0.5">{entrada.fecha}</p>
-                <p className="text-zinc-500 text-sm">{entrada.tipo}</p>
-              </div>
-
-              <div className="text-right shrink-0">
-                <p className="text-gold-400 font-bold text-xl">{entrada.precio} €</p>
-                <p className="text-zinc-600 text-xs mt-1 font-mono">{entrada.codigo}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+// Drawer carrito
+<div className={`fixed inset-y-0 right-0 z-30 w-full sm:w-96 bg-zinc-900 transition-transform duration-300 ${
+  carritoAbierto ? 'translate-x-0' : 'translate-x-full'
+}`}>
 ```
 
 ---
 
-## Estado al final de este apunte
+### 5.3 Dashboard Admin — `/admin`
 
-Al terminar este paso tenemos:
+Tabs: **Usuarios** / **Productos**. Modales para crear nuevas entradas. Botón eliminar por fila.
 
 ```text
-apps/web/
-  app/
-    layout.jsx          ← sidebar + estructura global
-    page.jsx            ← dashboard con datos hardcoded
-    globals.css
-    vip/
-      page.jsx
-    entradas/
-      page.jsx
-  components/
-    Sidebar.jsx
-    TarjetaEvento.jsx
-    PanelTurno.jsx
-    SeccionVIP.jsx
-  tailwind.config.js
+Roles: Cliente · Staff · Portero · Admin
+Categorías: Bebida · Comida
 ```
 
-Los datos son estáticos (definidos en cada archivo). En el siguiente apunte añadiremos **Zustand** para gestionar el estado del carrito y la selección de sala VIP; más adelante conectaremos todo a Supabase.
+---
+
+### 5.4 Dashboard Staff — `/staff`
+
+Cada pedido puede avanzar por tres estados:
+
+```text
+pendiente → preparando → completado
+```
+
+La transición se gestiona con dos objetos de configuración:
+
+```js
+const SIGUIENTE = { pendiente: 'preparando', preparando: 'completado' }
+
+const ESTADOS = {
+  pendiente:  { label: 'Pendiente',  color: 'text-amber-400',  icon: Clock },
+  preparando: { label: 'Preparando', color: 'text-blue-400',   icon: ChefHat },
+  completado: { label: 'Completado', color: 'text-emerald-400',icon: CheckCircle },
+}
+```
+
+Filtros: `todos / pendiente / preparando / completado`. Cuatro tarjetas de estadísticas en la cabecera.
+
+---
+
+### 5.5 Dashboard Porteros — `/porteros`
+
+Validación manual de QR. Formato válido: `FLEX-XXXX` (9 caracteres). Resultado visible 4 segundos, después se añade al historial.
+
+---
+
+### 5.6 Reserva VIP — `/vip`
+
+| Sala | Precio | Capacidad | Estado |
+| ---- | ------ | --------- | ------ |
+| Sala Roja | 150 €/h | 10 | Disponible |
+| Sala Negra | 200 €/h | 15 | Ocupada |
+| Sala Dorada | 300 €/h | 20 | Disponible |
+
+Flujo: seleccionar sala → fecha + hora + duración → precio calculado automáticamente → confirmar → pantalla de confirmación.
+
+---
+
+### 5.7 Mi área — `/mi-area`
+
+| Tab | Contenido |
+| --- | --------- |
+| Entradas | QR placeholder + evento, fecha, tipo, código |
+| Mis zonas | Zonas asignadas con descripción y evento |
+| Pedidos | Historial con ítems, estado (Entregado / En camino) y total |
+
+---
+
+### 5.8 Perfil — `/perfil`
+
+Accesible desde el avatar del sidebar (desktop) o el tab Perfil de la barra inferior (móvil).
+
+Cuatro pestañas:
+
+| Tab | Contenido |
+| --- | --------- |
+| Datos personales | Nombre, email, teléfono, fecha nacimiento, subir avatar |
+| Pago | Tarjetas guardadas + formulario nueva tarjeta (maqueta Stripe) |
+| Seguridad | Cambiar contraseña · Sesiones activas · Eliminar cuenta |
+| Notificaciones | Toggles: pedidos, entradas, VIP, promociones, newsletter |
+
+La sección de pago muestra una **previsualización visual** de la tarjeta que se actualiza en tiempo real mientras el usuario escribe.
+
+---
+
+## 6. Estructura final de archivos
+
+```text
+apps/web/src/
+  app/
+    layout.jsx              ← Google Fonts + Shell
+    globals.css             ← Tailwind v4 + tema dorado + tipografía
+    page.jsx                ← pedir comida/bebida (drawer carrito + modal mesa)
+    login/
+      page.jsx              ← login (sin Shell)
+    register/
+      page.jsx              ← registro (sin Shell)
+    perfil/
+      page.jsx              ← configuración de cuenta y pago
+    admin/
+      page.jsx              ← dashboard admin
+    staff/
+      page.jsx              ← dashboard staff (3 estados)
+    porteros/
+      page.jsx              ← scanner QR porteros
+    vip/
+      page.jsx              ← reserva salas VIP
+    mi-area/
+      page.jsx              ← área personal cliente
+  components/
+    Shell.jsx               ← layout responsivo + barra inferior móvil
+    Sidebar.jsx             ← navegación desktop + link a perfil
+    FlexLogo.jsx            ← logo SVG puro
+```
 
 ---
 

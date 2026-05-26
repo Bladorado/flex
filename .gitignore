@@ -6,3 +6,6 @@
 .env.keys
 .env.local
 .env.*.local
+
+apps/web/node_modules
+apps/web/.env.local
