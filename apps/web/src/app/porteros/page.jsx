@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { QrCode, CheckCircle, XCircle, Search } from 'lucide-react'
 
 const ENTRADAS_VALIDADAS = [
-  { id: 1, codigo: 'FLEX-2C7B', nombre: 'Alex García',  tipo: 'Pista Principal', hora: '23:01', ok: true  },
-  { id: 2, codigo: 'FLEX-9A3F', nombre: 'María López',  tipo: 'Zona VIP',        hora: '23:04', ok: true  },
-  { id: 3, codigo: 'FLEX-4D8X', nombre: 'Pedro Gil',    tipo: 'Pista Principal', hora: '23:09', ok: false },
-  { id: 4, codigo: 'FLEX-7E2Q', nombre: 'Sara Martín',  tipo: 'Pista Principal', hora: '23:15', ok: true  },
+  { id: 1, codigo: 'FLEX-2C7B', nombre: 'Alex García', tipo: 'Pista Principal', hora: '23:01', ok: true },
+  { id: 2, codigo: 'FLEX-9A3F', nombre: 'María López', tipo: 'Zona VIP', hora: '23:04', ok: true },
+  { id: 3, codigo: 'FLEX-4D8X', nombre: 'Pedro Gil', tipo: 'Pista Principal', hora: '23:09', ok: false },
+  { id: 4, codigo: 'FLEX-7E2Q', nombre: 'Sara Martín', tipo: 'Pista Principal', hora: '23:15', ok: true },
 ]
 
 export default function PaginaPorteros() {
@@ -68,11 +68,10 @@ export default function PaginaPorteros() {
 
           {/* Resultado */}
           {resultado && (
-            <div className={`rounded-2xl border p-6 flex items-center gap-4 ${
-              resultado.ok
+            <div className={`rounded-2xl border p-6 flex items-center gap-4 ${resultado.ok
                 ? 'bg-emerald-500/10 border-emerald-500/40'
                 : 'bg-red-500/10 border-red-500/40'
-            }`}>
+              }`}>
               {resultado.ok
                 ? <CheckCircle size={40} className="text-emerald-400 shrink-0" />
                 : <XCircle size={40} className="text-red-400 shrink-0" />

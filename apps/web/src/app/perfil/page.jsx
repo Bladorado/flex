@@ -4,14 +4,14 @@ import { useState } from 'react'
 import { Camera, Lock, Bell, Shield, LogOut, CheckCircle, CreditCard, Plus, Trash2 } from 'lucide-react'
 
 const TABS = [
-  { id: 'personal',       label: 'Datos personales' },
-  { id: 'pago',           label: 'Pago' },
-  { id: 'seguridad',      label: 'Seguridad' },
+  { id: 'personal', label: 'Datos personales' },
+  { id: 'pago', label: 'Pago' },
+  { id: 'seguridad', label: 'Seguridad' },
   { id: 'notificaciones', label: 'Notificaciones' },
 ]
 
 const TARJETAS_INIT = [
-  { id: 1, tipo: 'Visa',       ultimos: '4242', expira: '12/27', predeterminada: true },
+  { id: 1, tipo: 'Visa', ultimos: '4242', expira: '12/27', predeterminada: true },
   { id: 2, tipo: 'Mastercard', ultimos: '8210', expira: '09/26', predeterminada: false },
 ]
 
@@ -25,9 +25,9 @@ function iconoRed(tipo) {
 }
 
 export default function PaginaPerfil() {
-  const [tab, setTab]           = useState('personal')
+  const [tab, setTab] = useState('personal')
   const [guardado, setGuardado] = useState(false)
-  const [avatar, setAvatar]     = useState(null)
+  const [avatar, setAvatar] = useState(null)
 
   const [perfil, setPerfil] = useState({
     nombre: 'Alex García',
@@ -38,9 +38,9 @@ export default function PaginaPerfil() {
 
   const [pass, setPass] = useState({ actual: '', nueva: '', confirmar: '' })
 
-  const [tarjetas, setTarjetas]   = useState(TARJETAS_INIT)
+  const [tarjetas, setTarjetas] = useState(TARJETAS_INIT)
   const [nuevaTarjeta, setNuevaTarjeta] = useState(false)
-  const [formTarjeta, setFormTarjeta]   = useState({ numero: '', titular: '', expira: '', cvv: '' })
+  const [formTarjeta, setFormTarjeta] = useState({ numero: '', titular: '', expira: '', cvv: '' })
 
   function agregarTarjeta(e) {
     e.preventDefault()
@@ -56,10 +56,10 @@ export default function PaginaPerfil() {
   function predeterminar(id) { setTarjetas(prev => prev.map(t => ({ ...t, predeterminada: t.id === id }))) }
 
   const [notifs, setNotifs] = useState({
-    pedidos:    true,
-    entradas:   true,
-    ofertas:    false,
-    vip:        true,
+    pedidos: true,
+    entradas: true,
+    ofertas: false,
+    vip: true,
     newsletter: false,
   })
 
@@ -106,9 +106,8 @@ export default function PaginaPerfil() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              tab === t.id ? 'bg-gold-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-            }`}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${tab === t.id ? 'bg-gold-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+              }`}
           >
             {t.label}
           </button>
@@ -127,8 +126,8 @@ export default function PaginaPerfil() {
         <form onSubmit={guardar} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { key: 'nombre',   label: 'Nombre completo', type: 'text' },
-              { key: 'telefono', label: 'Teléfono',        type: 'text' },
+              { key: 'nombre', label: 'Nombre completo', type: 'text' },
+              { key: 'telefono', label: 'Teléfono', type: 'text' },
             ].map(({ key, label, type }) => (
               <div key={key}>
                 <label className="text-zinc-500 text-xs block mb-1.5">{label}</label>
@@ -286,8 +285,8 @@ export default function PaginaPerfil() {
               <h3 className="text-zinc-100 font-semibold text-sm">Cambiar contraseña</h3>
             </div>
             {[
-              { key: 'actual',    label: 'Contraseña actual' },
-              { key: 'nueva',     label: 'Nueva contraseña' },
+              { key: 'actual', label: 'Contraseña actual' },
+              { key: 'nueva', label: 'Nueva contraseña' },
               { key: 'confirmar', label: 'Confirmar nueva contraseña' },
             ].map(({ key, label }) => (
               <div key={key}>
@@ -310,7 +309,7 @@ export default function PaginaPerfil() {
             </div>
             {[
               { dispositivo: 'Chrome · Windows', lugar: 'Madrid, España', activo: true },
-              { dispositivo: 'Safari · iPhone',  lugar: 'Madrid, España', activo: false },
+              { dispositivo: 'Safari · iPhone', lugar: 'Madrid, España', activo: false },
             ].map((s, i) => (
               <div key={i} className="flex items-center justify-between py-3 border-t border-zinc-800 first:border-t-0">
                 <div>
@@ -347,11 +346,11 @@ export default function PaginaPerfil() {
           </div>
           <div className="divide-y divide-zinc-800">
             {[
-              { key: 'pedidos',    label: 'Estado de pedidos',   desc: 'Cuando tu pedido esté listo o en camino' },
-              { key: 'entradas',   label: 'Entradas y reservas', desc: 'Confirmaciones y recordatorios' },
-              { key: 'vip',        label: 'Salas VIP',           desc: 'Disponibilidad y ofertas de salas' },
-              { key: 'ofertas',    label: 'Promociones',         desc: 'Descuentos y eventos especiales' },
-              { key: 'newsletter', label: 'Newsletter',          desc: 'Novedades mensuales de Flex' },
+              { key: 'pedidos', label: 'Estado de pedidos', desc: 'Cuando tu pedido esté listo o en camino' },
+              { key: 'entradas', label: 'Entradas y reservas', desc: 'Confirmaciones y recordatorios' },
+              { key: 'vip', label: 'Salas VIP', desc: 'Disponibilidad y ofertas de salas' },
+              { key: 'ofertas', label: 'Promociones', desc: 'Descuentos y eventos especiales' },
+              { key: 'newsletter', label: 'Newsletter', desc: 'Novedades mensuales de Flex' },
             ].map(({ key, label, desc }) => (
               <div key={key} className="flex items-center justify-between py-4">
                 <div>
