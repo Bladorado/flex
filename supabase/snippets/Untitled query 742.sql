@@ -1,0 +1,65 @@
+-- insert into storage.buckets (id, name, public) values
+--   ('productos', 'productos', true),
+--   ('salas-vip', 'salas-vip', true);
+
+
+---Datos de ejemplo para llenar mi tabla de reservas
+
+-- insert into public.reservas
+-- (sala_id, cliente_id, inicio, fin, estado, stripe_session, stripe_payment, qr_token, total)
+-- values
+-- (
+--   1,
+--   '550e8400-e29b-41d4-a716-446655440000',
+--   '2026-05-22 18:00:00+02',
+--   '2026-05-22 20:00:00+02',
+--   'pagada',
+--   'cs_test_a1b2c3d4',
+--   'pi_a1b2c3d4',
+--   'QR-RES-0001',
+--   120.00
+-- ),
+-- (
+--   2,
+--   '550e8400-e29b-41d4-a716-446655440001',
+--   '2026-05-23 21:00:00+02',
+--   '2026-05-24 00:00:00+02',
+--   'pendiente',
+--   'cs_test_e5f6g7h8',
+--   null,
+--   'QR-RES-0002',
+--   250.50
+-- ),
+-- (
+--   3,
+--   '550e8400-e29b-41d4-a716-446655440002',
+--   '2026-05-24 16:00:00+02',
+--   '2026-05-24 18:30:00+02',
+--   'cancelada',
+--   null,
+--   null,
+--   'QR-RES-0003',
+--   90.00
+-- ),
+-- (
+--   1,
+--   '550e8400-e29b-41d4-a716-446655440003',
+--   '2026-05-22 21:00:00+02',
+--   '2026-05-22 23:00:00+02',
+--   'completada',
+--   'cs_test_x9y8z7',
+--   'pi_x9y8z7',
+--   'QR-RES-0004',
+--   180.75
+-- ),
+-- (
+--   2,
+--   '550e8400-e29b-41d4-a716-446655440004',
+--   '2026-05-25 19:30:00+02',
+--   '2026-05-25 22:00:00+02',
+--   'pagada',
+--   'cs_test_m1n2o3',
+--   'pi_m1n2o3',
+--   'QR-RES-0005',
+--   300.00
+-- );
