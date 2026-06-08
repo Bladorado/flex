@@ -9,15 +9,15 @@ import { actualizarPerfil, actualizarAvatar, actualizarContrasena } from '@/lib/
 
 const TABS = [
   { id: 'personal', label: 'Datos personales' },
-  { id: 'pago', label: 'Pago' },
+  // { id: 'pago', label: 'Pago' },
   { id: 'seguridad', label: 'Seguridad' },
   { id: 'notificaciones', label: 'Notificaciones' },
 ]
 
-const TARJETAS_INIT = [
-  { id: 1, tipo: 'Visa', ultimos: '4242', expira: '12/27', predeterminada: true },
-  { id: 2, tipo: 'Mastercard', ultimos: '8210', expira: '09/26', predeterminada: false },
-]
+// const TARJETAS_INIT = [
+//   { id: 1, tipo: 'Visa', ultimos: '4242', expira: '12/27', predeterminada: true },
+//   { id: 2, tipo: 'Mastercard', ultimos: '8210', expira: '09/26', predeterminada: false },
+// ]
 
 const LABEL_ROL = { cliente: 'Cliente', staff: 'Staff', portero: 'Portero', admin: 'Admin' }
 
@@ -36,8 +36,8 @@ export default function PerfilClient({ nombre, email, rol, avatarUrl }) {
 
   const [perfil, setPerfil] = useState({ nombre, email, telefono: '', fechaNac: '' })
   const [pass, setPass] = useState({ actual: '', nueva: '', confirmar: '' })
-  const [tarjetas, setTarjetas] = useState(TARJETAS_INIT)
-  const [nuevaTarjeta, setNuevaTarjeta] = useState(false)
+  // const [tarjetas, setTarjetas] = useState(TARJETAS_INIT)
+  // const [nuevaTarjeta, setNuevaTarjeta] = useState(false)
   const [formTarjeta, setFormTarjeta] = useState({ numero: '', titular: '', expira: '', cvv: '' })
   const [notifs, setNotifs] = useState({ pedidos: true, entradas: true, ofertas: false, vip: true, newsletter: false })
 
@@ -101,16 +101,16 @@ export default function PerfilClient({ nombre, email, rol, avatarUrl }) {
     })
   }
 
-  function agregarTarjeta(e) {
-    e.preventDefault()
-    const ultimos = formTarjeta.numero.replace(/\s/g, '').slice(-4)
-    const tipo = formTarjeta.numero.startsWith('4') ? 'Visa' : 'Mastercard'
-    setTarjetas(prev => [...prev, { id: Date.now(), tipo, ultimos, expira: formTarjeta.expira, predeterminada: false }])
-    setFormTarjeta({ numero: '', titular: '', expira: '', cvv: '' })
-    setNuevaTarjeta(false)
-  }
+  // function agregarTarjeta(e) {
+  //   e.preventDefault()
+  //   const ultimos = formTarjeta.numero.replace(/\s/g, '').slice(-4)
+  //   const tipo = formTarjeta.numero.startsWith('4') ? 'Visa' : 'Mastercard'
+  //   setTarjetas(prev => [...prev, { id: Date.now(), tipo, ultimos, expira: formTarjeta.expira, predeterminada: false }])
+  //   setFormTarjeta({ numero: '', titular: '', expira: '', cvv: '' })
+  //   setNuevaTarjeta(false)
+  // }
 
-  function eliminarTarjeta(id) { setTarjetas(prev => prev.filter(t => t.id !== id)) }
+  // function eliminarTarjeta(id) { setTarjetas(prev => prev.filter(t => t.id !== id)) }
   function predeterminar(id) { setTarjetas(prev => prev.map(t => ({ ...t, predeterminada: t.id === id }))) }
 
   function guardar(e) {
@@ -220,7 +220,7 @@ export default function PerfilClient({ nombre, email, rol, avatarUrl }) {
       )}
 
       {/* Pago */}
-      {tab === 'pago' && (
+      {/* {tab === 'pago' && (
         <div className="space-y-4">
           {tarjetas.map(t => (
             <div key={t.id} className={`bg-zinc-900 border rounded-2xl p-5 flex items-center gap-4 ${t.predeterminada ? 'border-gold-500/50' : 'border-zinc-800'}`}>
@@ -315,7 +315,7 @@ export default function PerfilClient({ nombre, email, rol, avatarUrl }) {
             </button>
           )}
         </div>
-      )}
+      )} */}
 
       {/* Seguridad */}
       {tab === 'seguridad' && (
