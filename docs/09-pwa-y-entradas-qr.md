@@ -1,74 +1,102 @@
-# 05 — PWA y Entradas QR
+# 09 — PWA y Entradas QR
 
-> **Proyecto Flex** · Stack: Next.js · Supabase · Zustand · Stripe  
-> Nivel: Intermedio
-
----
-
-## ¿Por qué una PWA?
-
-Una Progressive Web App (PWA) es una web que se comporta como una app nativa:
-
-- Se puede instalar en el móvil desde el navegador (sin App Store)
-- Funciona offline (con Service Worker)
-- Envía notificaciones push
-- Aparece en la pantalla de inicio con su icono
-
-Para Flex es perfecta: el cliente accede a su entrada QR desde el móvil, sin tener que descargar nada.
-
-```
-Web normal:   Cliente ──▶ Abre el navegador cada vez
-PWA:          Cliente ──▶ Icono en pantalla de inicio ──▶ Experiencia de app
-```
+> **Proyecto Flex** · Stack: Next.js · Supabase · Stripe  
+> Antes de continuar, deberías haber terminado el apunte 07 (Stripe). El QR de entrada nace exactamente en ese punto.
 
 ---
 
-## 1. Convertir Next.js en PWA
+## ¿Qué vamos a conseguir?
 
-### 1.1 Instalar `next-pwa`
+Ahora mismo, cuando el usuario paga una reserva:
+
+1. Stripe confirma el pago
+2. El webhook actualiza `estado_pago = 'pagado'` en la tabla `reservas`
+3. Y también genera un `qr_token` — un código único que se guarda en `reservas.qr_token`
+
+Pero ese `qr_token` no lo ve nadie. La página de éxito (`/reserva/exito`) ya dice "Tu entrada con código QR ya está disponible en tu perfil", pero el perfil todavía no muestra ningún QR.
+
+En este apunte vamos a:
+
+1. **Convertir la app en PWA** — para que el usuario pueda instalarla en el móvil como si fuera una app nativa
+2. **Mostrar el código QR de la entrada** — a partir del `qr_token` que ya existe en la base de datos
+3. **Conectar la página del portero** — para que valide entradas reales en vez de datos inventados
+
+```
+Lo que ya existe:          Lo que vamos a construir:
+─────────────────          ──────────────────────────
+reservas.qr_token    ──▶   Componente QR visual
+/reserva/exito       ──▶   Enlace a la entrada
+/porteros (estático) ──▶   /porteros conectado a Supabase
+                     ──▶   manifest.json (PWA)
+```
+
+---
+
+## Paso 1 — Convertir la app en PWA
+
+Una **PWA** (Progressive Web App) es una web que el móvil puede instalar como si fuera una app nativa: tiene icono en la pantalla de inicio, se abre sin barra del navegador, y puede funcionar sin conexión.
+
+Para Flex tiene sentido: el cliente entra al local, saca el móvil, abre su entrada QR. Si tiene la PWA instalada, lo hace en dos toques desde la pantalla de inicio, sin buscar el navegador ni la URL.
+
+```
+Web normal:   Usuario ──▶ Abre Chrome ──▶ Escribe la URL ──▶ Ve el QR
+PWA:          Usuario ──▶ Toca el icono de Flex ──▶ Ve el QR
+```
+
+### 1.1 Instalar next-pwa
+
+Desde la carpeta `apps/web/`:
 
 ```bash
-pnpm add next-pwa
+npm install next-pwa
 ```
 
-### 1.2 Configurar `next.config.js`
+### 1.2 Modificar next.config
+
+Abre `apps/web/next.config.mjs` (o `.js`, dependiendo de tu proyecto) y envuelve la configuración con `withPWA`:
 
 ```js
-// next.config.js
-const withPWA = require('next-pwa')({
-  dest: 'public',          // dónde genera el Service Worker
-  disable: process.env.NODE_ENV === 'development',  // no en dev (rompe hot reload)
-  register: true,          // registra el SW automáticamente
-  skipWaiting: true,       // activa el nuevo SW sin esperar a cerrar pestañas
-  // Rutas que SÍ queremos cachear offline
-  runtimeCaching: [
-    {
-      urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
-      handler: 'CacheFirst',           // primero caché, luego red
-      options: {
-        cacheName: 'supabase-storage',
-        expiration: { maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 },
-      },
-    },
-    {
-      urlPattern: /^\//,               // rutas internas de la app
-      handler: 'NetworkFirst',         // primero red, caché como fallback
-      options: { cacheName: 'flex-pages' },
-    },
-  ],
+// apps/web/next.config.mjs
+import withPWAInit from 'next-pwa'
+
+const withPWA = withPWAInit({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
 })
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ...tu configuración existente
+  // ...tu configuración que ya tenías
 }
 
-module.exports = withPWA(nextConfig)
+export default withPWA(nextConfig)
 ```
 
-### 1.3 Web App Manifest (`public/manifest.json`)
+> `disable: process.env.NODE_ENV === 'development'` es importante: el Service Worker interfiere con el hot reload de Next.js en local. Solo lo activamos en producción.
 
-El manifest le dice al navegador cómo instalar la PWA:
+Si tu archivo usa `require` en vez de `import`, la sintaxis es:
+
+```js
+// apps/web/next.config.js
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+})
+
+module.exports = withPWA({
+  // ...tu configuración que ya tenías
+})
+```
+
+### 1.3 Crear el manifest
+
+El manifest es un archivo JSON que le dice al navegador cómo instalar la PWA: cómo se llama, qué icono usar, de qué color es la barra de estado...
+
+Crea el archivo `apps/web/public/manifest.json`:
 
 ```json
 {
@@ -93,284 +121,284 @@ El manifest le dice al navegador cómo instalar la PWA:
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshots/home.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
   ]
 }
 ```
 
+> Por ahora puedes usar cualquier imagen de 192×192 y 512×512 píxeles y guardarlas en `apps/web/public/icons/`. Más adelante puedes generar los iconos con el diseño oficial de Flex.
+
 ### 1.4 Enlazar el manifest en el layout
 
-```jsx
-// app/layout.jsx
-export const metadata = {
-  title: 'Flex Underground',
-  description: 'Tu sala de Jam Sessions',
-  manifest: '/manifest.json',
-  themeColor: '#e63946',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'Flex',
-  },
-}
+El layout ya existe en `apps/web/src/app/layout.jsx`. Solo hay que añadir la referencia al manifest:
 
-export default function RootLayout({ children }) {
-  return (
-    <html lang="es">
-      <head>
-        {/* iOS necesita esto para el icono en pantalla de inicio */}
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-      </head>
-      <body>{children}</body>
-    </html>
-  )
+```jsx
+// apps/web/src/app/layout.jsx
+export const metadata = {
+  // ...lo que ya tenías
+  manifest: '/manifest.json',
 }
 ```
+
+Si usas el objeto `metadata` de Next.js App Router, añade solo esa línea. Si en el `<head>` estás poniendo etiquetas manualmente, añade:
+
+```html
+<link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+```
+
+La segunda línea es para iOS, que no usa el manifest para el icono de pantalla de inicio.
+
+### ¿Cómo verificar que funciona?
+
+Despliega en Vercel (o usa un túnel como ngrok en local, ya que el Service Worker requiere HTTPS). Luego:
+
+1. Abre Chrome en el móvil
+2. Entra en la URL de la app
+3. Chrome mostrará un banner "Añadir a la pantalla de inicio" (o estará en el menú del navegador)
+4. En desktop: Chrome DevTools → Application → Manifest — tiene que aparecer sin errores
 
 ---
 
-## 2. Generación del código QR
+## Paso 2 — El código QR de la entrada
 
-### ¿Qué contiene el QR?
+### ¿Qué es el qr_token y de dónde viene?
 
-El QR no contiene datos sensibles directamente. Contiene una **URL** que apunta a la entrada:
+Cuando el usuario paga una reserva, el webhook de Stripe ejecuta esto:
+
+```js
+// apps/web/src/app/api/webhook/route.js  (ya existe)
+await supabase
+  .from('reservas')
+  .update({
+    estado_pago:    'pagado',
+    stripe_payment: session.payment_intent,
+    qr_token:       crypto.randomUUID(),  // ← aquí se genera
+  })
+  .eq('id', id)
+  .eq('estado_pago', 'pendiente')
+```
+
+`crypto.randomUUID()` genera un identificador único como `a3f8b2c1-4d5e-6f7a-8b9c-0d1e2f3a4b5c`. Ese valor se guarda en `reservas.qr_token`. La columna tiene `unique` en el esquema, así que dos reservas nunca pueden tener el mismo token.
+
+**El QR no es más que una forma visual de representar una URL** que incluye ese token:
 
 ```
-https://flex.vercel.app/entrada/<qr_token>
+https://flex.vercel.app/entrada/a3f8b2c1-4d5e-6f7a-8b9c-0d1e2f3a4b5c
 ```
 
-El `qr_token` es el UUID único que generó el webhook de Stripe (apunte 04). El portero escanea el QR y la app verifica en Supabase si el token es válido.
+El portero escanea el QR → el móvil abre esa URL → la app comprueba en Supabase si el token es válido.
 
-### 2.1 Instalar la librería QR
+### 2.1 Instalar la librería de QR
 
 ```bash
-pnpm add qrcode
+npm install qrcode
 ```
 
-### 2.2 Componente `EntradaQR`
+### 2.2 Crear el componente EntradaQR
+
+Este componente recibe el `qr_token` y dibuja el código QR en un `<canvas>`:
 
 ```jsx
-// components/EntradaQR.jsx
+// apps/web/src/components/EntradaQR.jsx
 'use client'
 
 import { useEffect, useRef } from 'react'
 import QRCode from 'qrcode'
 
-/**
- * Renderiza un código QR en un canvas.
- * @param {string} props.token  - El qr_token de la reserva
- * @param {string} props.appUrl - La URL base de la app
- */
-export default function EntradaQR({ token, appUrl }) {
+export default function EntradaQR({ token }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
     if (!token || !canvasRef.current) return
 
-    const url = `${appUrl}/entrada/${token}`
+    const url = `${window.location.origin}/entrada/${token}`
 
     QRCode.toCanvas(canvasRef.current, url, {
-      width:           250,
-      margin:          2,
+      width: 220,
+      margin: 2,
       color: {
-        dark:  '#ffffff',   // módulos del QR (blanco sobre fondo oscuro)
-        light: '#0a0a0a',   // fondo del QR
+        dark:  '#ffffff',
+        light: '#18181b',
       },
-    }, (err) => {
-      if (err) console.error('Error generando QR:', err)
     })
-  }, [token, appUrl])
+  }, [token])
 
   return (
-    <div className="entrada-qr">
-      <canvas ref={canvasRef} aria-label="Código QR de entrada" />
-      <p className="qr-hint">Muestra este QR en la puerta de la sala VIP</p>
+    <div className="flex flex-col items-center gap-3">
+      <canvas ref={canvasRef} className="rounded-xl" />
+      <p className="text-zinc-500 text-xs text-center">
+        Muestra este QR en la entrada de la sala VIP
+      </p>
     </div>
   )
 }
 ```
 
-### 2.3 Página de la entrada (`/entrada/[token]`)
+> `QRCode.toCanvas` dibuja el QR directamente sobre el elemento `<canvas>`. El `useEffect` se ejecuta en el navegador (no en el servidor) — por eso este componente necesita `'use client'`.
+
+### 2.3 Crear la página de la entrada
+
+Cuando el portero escanea el QR, el móvil abre `/entrada/[token]`. Esta página tiene que:
+
+1. Buscar en Supabase la reserva con ese `qr_token`
+2. Comprobar que está pagada
+3. Mostrar los datos de la reserva y el QR
 
 ```jsx
-// app/entrada/[token]/page.jsx
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+// apps/web/src/app/entrada/[token]/page.jsx
+import { createClient } from '@/lib/supabase/server'
 import EntradaQR from '@/components/EntradaQR'
 
 export default async function PaginaEntrada({ params }) {
-  const { token } = params
-  const cookieStore = cookies()
+  const { token } = await params
+  const supabase = await createClient()
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  )
-
-  // Buscamos la reserva por qr_token
   const { data: reserva } = await supabase
     .from('reservas')
     .select(`
       id,
       inicio,
       fin,
-      estado,
+      estado_pago,
       total,
       qr_token,
-      salas_vip ( nombre, imagen_url ),
+      salas_vip ( nombre ),
       perfiles  ( nombre )
     `)
     .eq('qr_token', token)
     .single()
 
-  // Token inválido o reserva no pagada
-  if (!reserva || reserva.estado !== 'pagada') {
+  // Si no existe la reserva o no está pagada, mostramos error
+  if (!reserva || reserva.estado_pago !== 'pagado') {
     return (
-      <div className="entrada-invalida">
-        <h1>Entrada no válida</h1>
-        <p>Este código QR no corresponde a ninguna reserva activa.</p>
+      <div className="p-8 text-center text-zinc-400">
+        <p className="text-xl font-bold text-red-400 mb-2">Entrada no válida</p>
+        <p className="text-sm">Este código QR no corresponde a ninguna reserva pagada.</p>
       </div>
     )
   }
 
-  const ahora   = new Date()
-  const inicio  = new Date(reserva.inicio)
-  const fin     = new Date(reserva.fin)
-  const valida  = ahora >= inicio && ahora <= fin
+  const inicio = new Date(reserva.inicio)
+  const fin    = new Date(reserva.fin)
+  const ahora  = new Date()
+  const activa = ahora >= inicio && ahora <= fin
 
   return (
-    <div className="entrada-container">
-      <h1>Entrada Flex 🎸</h1>
+    <div className="p-6 flex flex-col items-center gap-6 max-w-sm mx-auto text-center">
+      <h1 className="text-xl font-bold text-zinc-100">Entrada Flex</h1>
 
-      <div className="entrada-info">
-        <img src={reserva.salas_vip.imagen_url} alt={reserva.salas_vip.nombre} />
-        <h2>{reserva.salas_vip.nombre}</h2>
-        <p>Titular: {reserva.perfiles.nombre}</p>
-        <p>Entrada: {inicio.toLocaleString('es-ES')}</p>
-        <p>Salida:  {fin.toLocaleString('es-ES')}</p>
-        <p>Total pagado: {reserva.total} €</p>
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 w-full text-left space-y-2">
+        <p className="text-zinc-100 font-semibold">{reserva.salas_vip.nombre}</p>
+        <p className="text-zinc-400 text-sm">Titular: {reserva.perfiles.nombre}</p>
+        <p className="text-zinc-400 text-sm">
+          Entrada: {inicio.toLocaleString('es-ES')}
+        </p>
+        <p className="text-zinc-400 text-sm">
+          Salida: {fin.toLocaleString('es-ES')}
+        </p>
+        <p className="text-gold-400 font-bold">{reserva.total} € pagados</p>
       </div>
 
-      {/* Estado visual de la entrada */}
-      <div className={`estado-entrada ${valida ? 'valida' : 'fuera-de-rango'}`}>
-        {valida ? '✅ ENTRADA VÁLIDA' : '⚠️ FUERA DEL HORARIO'}
+      <div className={`w-full rounded-2xl py-3 font-bold text-lg ${
+        activa
+          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+          : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
+      }`}>
+        {activa ? 'ENTRADA VÁLIDA' : 'FUERA DE HORARIO'}
       </div>
 
-      {/* El QR muestra la URL pública de esta misma página */}
-      <EntradaQR
-        token={token}
-        appUrl={process.env.NEXT_PUBLIC_APP_URL}
-      />
+      <EntradaQR token={reserva.qr_token} />
     </div>
   )
 }
 ```
 
-### 2.4 Página de perfil del usuario (acceso a sus entradas)
+### 2.4 Mostrar el enlace a la entrada desde Mi Área
+
+La página `/mi-area` ya existe y muestra las reservas del usuario. Solo hay que añadir el enlace a la entrada QR cuando la reserva está pagada.
+
+Abre `apps/web/src/components/mi-area/MiAreaClient.jsx` y busca donde se renderizan las reservas. Añade el enlace:
 
 ```jsx
-// app/perfil/page.jsx
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+// Dentro del map de reservas, añade esto si la reserva tiene qr_token:
 import Link from 'next/link'
 
-export default async function PaginaPerfil() {
-  const cookieStore = cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  )
+// Donde ya muestras los datos de cada reserva:
+{reserva.qr_token && (
+  <Link
+    href={`/entrada/${reserva.qr_token}`}
+    className="inline-block mt-2 px-4 py-1.5 bg-gold-500 hover:bg-gold-600 text-zinc-950 text-xs font-bold rounded-xl"
+  >
+    Ver entrada QR →
+  </Link>
+)}
+```
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+> `reserva.qr_token` solo existe cuando `estado_pago = 'pagado'` — el webhook solo lo genera cuando el pago se confirma. Si la reserva está pendiente, el campo es `null` y el enlace no aparece.
 
-  // Solo reservas pagadas (tienen QR)
-  const { data: reservas } = await supabase
-    .from('reservas')
-    .select('id, inicio, fin, qr_token, salas_vip(nombre)')
-    .eq('cliente_id', user.id)
-    .eq('estado', 'pagada')
-    .order('inicio', { ascending: false })
+Pero espera: la query de `/mi-area` no está pidiendo `qr_token`. Hay que añadirlo al select:
 
-  return (
-    <div>
-      <h1>Mis entradas</h1>
-      {reservas?.length === 0 && <p>No tienes reservas pagadas.</p>}
-      {reservas?.map((reserva) => (
-        <div key={reserva.id} className="tarjeta-entrada">
-          <h3>{reserva.salas_vip.nombre}</h3>
-          <p>{new Date(reserva.inicio).toLocaleString('es-ES')}</p>
-          {/* Enlace a la página de entrada con el QR */}
-          <Link href={`/entrada/${reserva.qr_token}`}>
-            Ver entrada QR →
-          </Link>
-        </div>
-      ))}
-    </div>
-  )
-}
+```js
+// apps/web/src/app/mi-area/page.jsx
+// Cambia el select de reservas para incluir qr_token y estado_pago:
+supabase
+  .from('reservas')
+  .select(`
+    id, inicio, fin, estado, estado_pago, qr_token,
+    salas_vip ( nombre, descripcion )
+  `)
+  .eq('cliente_id', user.id)
+  .order('inicio', { ascending: false }),
 ```
 
 ---
 
-## 3. Edge Function: Verificar QR (para el portero)
+## Paso 3 — Conectar la página del portero
 
-El portero usa una app interna que escanea el QR y llama a esta Edge Function.
+La página `/porteros` ya existe pero es completamente estática: tiene datos de prueba inventados y la validación comprueba si el código empieza por "FLEX-", que no tiene nada que ver con nuestra base de datos.
 
-```bash
-supabase functions new verificar-entrada
-```
+Vamos a conectarla a Supabase para que valide el `qr_token` real.
+
+### ¿Cómo funciona la validación?
+
+El portero escribe o escanea el token (el UUID de la reserva). La app busca en Supabase si existe una reserva con ese `qr_token` que:
+
+1. Tenga `estado_pago = 'pagado'`
+2. Esté en el rango horario correcto (entre `inicio` y `fin`)
+
+Si las dos condiciones se cumplen, la entrada es válida.
+
+### 3.1 Crear la Server Action de verificación
 
 ```js
-// supabase/functions/verificar-entrada/index.js
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2?target=deno'
+// apps/web/src/lib/actions/portero.js
+'use server'
 
-Deno.serve(async (req) => {
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 })
+import { createClient } from '@/lib/supabase/server'
+
+export async function verificarEntrada(token) {
+  if (!token?.trim()) {
+    return { valida: false, motivo: 'Token vacío' }
   }
 
-  const { token } = await req.json()
-
-  if (!token) {
-    return new Response(
-      JSON.stringify({ valida: false, motivo: 'Token no proporcionado' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL'),
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  )
+  const supabase = await createClient()
 
   const { data: reserva } = await supabase
     .from('reservas')
-    .select('id, inicio, fin, estado, perfiles(nombre), salas_vip(nombre)')
-    .eq('qr_token', token)
+    .select(`
+      id, inicio, fin, estado_pago,
+      salas_vip ( nombre ),
+      perfiles  ( nombre )
+    `)
+    .eq('qr_token', token.trim())
     .single()
 
   if (!reserva) {
-    return new Response(
-      JSON.stringify({ valida: false, motivo: 'Token no encontrado' }),
-      { headers: { 'Content-Type': 'application/json' } }
-    )
+    return { valida: false, motivo: 'Token no encontrado' }
   }
 
-  if (reserva.estado !== 'pagada') {
-    return new Response(
-      JSON.stringify({ valida: false, motivo: `Estado: ${reserva.estado}` }),
-      { headers: { 'Content-Type': 'application/json' } }
-    )
+  if (reserva.estado_pago !== 'pagado') {
+    return { valida: false, motivo: 'Reserva no pagada' }
   }
 
   const ahora  = new Date()
@@ -378,73 +406,257 @@ Deno.serve(async (req) => {
   const fin    = new Date(reserva.fin)
 
   // Permitimos entrada 15 minutos antes del inicio
-  const margenMs = 15 * 60 * 1000
-  const dentroDeRango = ahora >= new Date(inicio - margenMs) && ahora <= fin
+  const inicioConMargen = new Date(inicio.getTime() - 15 * 60 * 1000)
 
-  if (!dentroDeRango) {
-    return new Response(
-      JSON.stringify({
-        valida: false,
-        motivo: 'Fuera del horario de la reserva',
-        inicio: inicio.toISOString(),
-        fin:    fin.toISOString(),
-      }),
-      { headers: { 'Content-Type': 'application/json' } }
-    )
+  if (ahora < inicioConMargen || ahora > fin) {
+    return {
+      valida:  false,
+      motivo:  'Fuera del horario de la reserva',
+      inicio:  inicio.toLocaleString('es-ES'),
+      fin:     fin.toLocaleString('es-ES'),
+    }
   }
 
-  // Entrada válida: marcamos la reserva como 'completada'
-  await supabase
-    .from('reservas')
-    .update({ estado: 'completada' })
-    .eq('id', reserva.id)
+  return {
+    valida:   true,
+    cliente:  reserva.perfiles.nombre,
+    sala:     reserva.salas_vip.nombre,
+    inicio:   inicio.toLocaleString('es-ES'),
+    fin:      fin.toLocaleString('es-ES'),
+  }
+}
+```
 
-  return new Response(
-    JSON.stringify({
-      valida:   true,
-      cliente:  reserva.perfiles.nombre,
-      sala:     reserva.salas_vip.nombre,
-      inicio:   inicio.toISOString(),
-      fin:      fin.toISOString(),
-    }),
-    { headers: { 'Content-Type': 'application/json' } }
+### 3.2 Actualizar la página del portero
+
+Reemplaza el contenido de `apps/web/src/app/porteros/page.jsx` para que use la Server Action real:
+
+```jsx
+// apps/web/src/app/porteros/page.jsx
+'use client'
+
+import { useState, useTransition } from 'react'
+import { QrCode, CheckCircle, XCircle, Search } from 'lucide-react'
+import { verificarEntrada } from '@/lib/actions/portero'
+
+export default function PaginaPorteros() {
+  const [codigo, setCodigo]     = useState('')
+  const [resultado, setResultado] = useState(null)
+  const [historial, setHistorial] = useState([])
+  const [isPending, startTransition] = useTransition()
+
+  function escanear() {
+    if (!codigo.trim()) return
+
+    startTransition(async () => {
+      const res = await verificarEntrada(codigo)
+
+      const entrada = {
+        id:      Date.now(),
+        codigo:  codigo.trim(),
+        nombre:  res.valida ? res.cliente : 'Desconocido',
+        sala:    res.valida ? res.sala    : '—',
+        motivo:  res.motivo ?? null,
+        hora:    new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        ok:      res.valida,
+      }
+
+      setResultado(entrada)
+      setHistorial(prev => [entrada, ...prev.slice(0, 19)]) // máximo 20 en historial
+      setTimeout(() => setResultado(null), 5000)
+      setCodigo('')
+    })
+  }
+
+  return (
+    <div className="p-4 sm:p-8">
+      <div className="mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-zinc-100">Panel de Porteros</h1>
+        <p className="text-zinc-500 text-sm mt-1">Validación de entradas en puerta</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Scanner */}
+        <div className="space-y-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 flex flex-col items-center gap-6">
+            <div className="w-48 h-48 bg-zinc-800 rounded-2xl flex items-center justify-center border-2 border-dashed border-zinc-700">
+              <QrCode size={80} className="text-zinc-600" />
+            </div>
+            <p className="text-zinc-500 text-sm text-center">
+              Pega el token del QR o escríbelo manualmente
+            </p>
+            <div className="w-full flex gap-2">
+              <input
+                placeholder="Token de la entrada (UUID)"
+                value={codigo}
+                onChange={e => setCodigo(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && escanear()}
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-gold-500"
+              />
+              <button
+                onClick={escanear}
+                disabled={isPending}
+                className="px-4 py-2 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-zinc-950 text-sm font-semibold rounded-lg"
+              >
+                <Search size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Resultado */}
+          {resultado && (
+            <div className={`rounded-2xl border p-6 flex items-center gap-4 ${
+              resultado.ok
+                ? 'bg-emerald-500/10 border-emerald-500/40'
+                : 'bg-red-500/10 border-red-500/40'
+            }`}>
+              {resultado.ok
+                ? <CheckCircle size={40} className="text-emerald-400 shrink-0" />
+                : <XCircle    size={40} className="text-red-400 shrink-0" />
+              }
+              <div>
+                <p className={`text-xl font-bold ${resultado.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {resultado.ok ? 'ENTRADA VÁLIDA' : 'ENTRADA INVÁLIDA'}
+                </p>
+                <p className="text-zinc-300 text-sm mt-0.5">{resultado.nombre}</p>
+                <p className="text-zinc-500 text-xs">
+                  {resultado.sala}
+                  {resultado.motivo && ` · ${resultado.motivo}`}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Historial */}
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-100 mb-4">Últimas validaciones</h2>
+          {historial.length === 0 && (
+            <p className="text-zinc-600 text-sm">Aún no hay validaciones esta sesión.</p>
+          )}
+          <div className="space-y-2">
+            {historial.map(e => (
+              <div key={e.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center gap-4">
+                {e.ok
+                  ? <CheckCircle size={18} className="text-emerald-400 shrink-0" />
+                  : <XCircle    size={18} className="text-red-400 shrink-0" />
+                }
+                <div className="flex-1 min-w-0">
+                  <p className="text-zinc-100 text-sm font-medium truncate">{e.nombre}</p>
+                  <p className="text-zinc-500 text-xs">{e.sala || e.motivo}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-zinc-600 text-xs">{e.hora}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   )
-})
+}
+```
+
+### 3.3 Proteger la página por rol
+
+La página del portero debería ser solo accesible para usuarios con `rol = 'portero'` (o `admin`). El proyecto ya tiene el middleware en `proxy.js` que ejecuta la protección de rutas. Añade la comprobación al principio de la página o en el middleware:
+
+```js
+// Al principio del componente de servidor (si conviertes el wrapper a Server Component):
+const supabase = await createClient()
+const { data: { user } } = await supabase.auth.getUser()
+
+const { data: perfil } = await supabase
+  .from('perfiles')
+  .select('rol')
+  .eq('id', user.id)
+  .single()
+
+if (!perfil || !['portero', 'admin'].includes(perfil.rol)) {
+  redirect('/')
+}
 ```
 
 ---
 
-## 4. Verificar que es una PWA instalable
+## Flujo completo
 
-Abre Chrome DevTools → pestaña **Application** → **Manifest**.
+Así queda el flujo de principio a fin:
 
-Debe mostrar:
-- ✅ Manifest válido
-- ✅ Service Worker registrado
-- ✅ Al menos un icono de 192×192
-
-En móvil (Chrome), aparecerá el banner "Añadir a pantalla de inicio" automáticamente si:
-- La web se sirve por HTTPS
-- El manifest está correctamente enlazado
-- El Service Worker está activo
+```text
+1. Usuario reserva una sala
+        │
+        ▼
+2. Paga en Stripe
+        │
+        ▼
+3. Webhook recibe checkout.session.completed
+   → estado_pago = 'pagado'
+   → qr_token = crypto.randomUUID()   ← se guarda en reservas
+        │
+        ▼
+4. Usuario va a /mi-area
+   → Ve sus reservas
+   → Si hay qr_token → aparece el botón "Ver entrada QR"
+        │
+        ▼
+5. Usuario pulsa "Ver entrada QR"
+   → Va a /entrada/[token]
+   → Se muestra el QR y los datos de la reserva
+        │
+        ▼
+6. En la puerta: el portero abre /porteros
+   → Escanea / pega el token
+   → La Server Action busca en Supabase
+   → Verde si está pagada y en horario, rojo si no
+```
 
 ---
 
-## Reto Flex 🎸
+## Probar en local
 
-1. Añade al componente `EntradaQR` un botón **"Descargar QR"** que use `canvas.toDataURL('image/png')` para crear un enlace de descarga con el QR en alta resolución (512×512 px).
+Para probar el QR en local:
 
-2. Crea una ruta `/portero` (protegida por rol `portero`) con un formulario donde el portero pueda **escribir manualmente** el token si el escáner falla, y llame a la Edge Function `verificar-entrada`. Muestra el resultado con un indicador visual verde/rojo.
+1. Haz una reserva y completa el pago (con la tarjeta de prueba `4242 4242 4242 4242`)
+2. El webhook de Stripe tiene que estar corriendo con `stripe listen`
+3. Ve a `/mi-area` — deberías ver el enlace "Ver entrada QR"
+4. Entra en `/entrada/[token]` — verás el QR y los datos
+5. Copia el token de la URL
+6. Ve a `/porteros`, pégalo y pulsa buscar
 
-3. Configura en `manifest.json` un `shortcut` de acceso rápido a `/perfil` para que los usuarios con la PWA instalada puedan acceder directamente a sus entradas desde el icono.
+Si el pago se realizó correctamente y el portero verifica dentro del rango horario de la reserva, verás "ENTRADA VÁLIDA" en verde.
 
-> **Pista:** Los shortcuts del manifest se definen así:
-> ```json
-> "shortcuts": [{ "name": "Mis entradas", "url": "/perfil", "icons": [...] }]
-> ```
+---
+
+## Reto
+
+1. **Botón de descarga** — añade al componente `EntradaQR` un botón "Descargar QR" que use `canvas.toDataURL('image/png')` para generar un enlace de descarga con el QR en alta resolución.
+
+2. **Marcar como usada** — cuando el portero valida una entrada correctamente, actualiza el campo `estado` de la reserva a `'completada'` en Supabase, para que no se pueda volver a usar el mismo QR.
+
+   > Pista: en la Server Action `verificarEntrada`, tras comprobar que la entrada es válida, añade:
+
+   ```js
+   await supabase.from('reservas').update({ estado: 'completada' }).eq('id', reserva.id)
+   ```
+
+   Y en la comprobación añade también que `estado !== 'completada'`.
+
+3. **Shortcut en el manifest** — añade un shortcut en `manifest.json` para que los usuarios con la PWA instalada puedan ir directamente a `/mi-area` desde el icono:
+
+   ```json
+   "shortcuts": [
+     {
+       "name": "Mis entradas",
+       "url": "/mi-area",
+       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+     }
+   ]
+   ```
 
 ---
 
 ## Navegación
 
-[← 05 — Stripe y Edge Functions](./05-stripe-y-edge-functions.md) · [07 — Realtime y Vercel →](./07-realtime-y-vercel.md)
+[← 08 — Teoría: Edge Functions](./teoria/08-teoria.md) · [10 — Realtime y Vercel →](./10-realtime-y-vercel.md)

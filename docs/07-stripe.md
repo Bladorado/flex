@@ -667,14 +667,10 @@ sudo mv stripe /usr/local/bin/
 (En otras distros: revisa los [paquetes oficiales](https://github.com/stripe/stripe-cli#install-the-cli) — Debian/Ubuntu tienen su propio repo apt, y también hay binarios sueltos para cualquier Linux.)
 
 **Windows:**
-```powershell
-# Con Scoop (recomendado)
-scoop install stripe
-
-# O con winget
-winget install stripe.stripe-cli
+```Git bash
+# Instalar el cliente de stripe global
+npm install -g @stripe/cli
 ```
-También puedes descargar el `.exe` directamente desde la [página de releases](https://github.com/stripe/stripe-cli/releases/latest) y añadirlo al PATH manualmente.
 
 ### Autenticación
 
@@ -694,9 +690,18 @@ stripe listen --forward-to localhost:3000/api/webhook
 
 # Terminal 2 — simula un pago completado
 stripe trigger checkout.session.completed
+
 ```
 
 Al arrancar, `stripe listen` imprime un secreto (`whsec_...`) — cópialo en `STRIPE_WEBHOOK_SECRET` de tu `.env.local`. Es **distinto** cada vez que reinicias el comando, así que si tu webhook empieza a devolver "Firma inválida", lo primero es comprobar que ese valor sigue coincidiendo. La terminal de `stripe listen` además te muestra en vivo cada evento que llega y el código de respuesta de tu servidor (`[200]`, `[400]`, etc.), lo cual es muy útil para depurar.
+
+### Simular un pago manualmente. Tarjeta de prueba:
+
+**Número de tarjeta:** 4242424242424242
+**Fecha de caducidad:** 12/34
+**CVC:** 123
+
+
 
 ---
 
@@ -712,4 +717,4 @@ Añade soporte para **reembolsos**: si el cliente cancela con más de 24 horas d
 
 ## Navegación
 
-[← 04 — Estado con Zustand](./04-estado-con-zustand.md) · [06 — PWA y Entradas QR →](./06-pwa-y-entradas-qr.md)
+[← 04 — Estado con Zustand](./06-productos.md) · [06 — PWA y Entradas QR →](./08-pwa-y-entradas-qr.md)
