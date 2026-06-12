@@ -31,10 +31,12 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'ktwnpnzopnucgfpmleuk.supabase.co',
+        hostname: 'hwgudaptfhyeotuomhcq.supabase.co',
       },
     ],
   },
 }
+
+
 
 export default withPWA(nextConfig)
