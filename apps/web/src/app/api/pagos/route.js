@@ -52,7 +52,7 @@ export async function POST(req) {
       quantity: item.cantidad,
     }))
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    const baseUrl = process.env.git_URL
 
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
